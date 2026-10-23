@@ -1,0 +1,521 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Plantita en 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: banco de trabajo. Visor 3D a la izquierda, ficha técnica de la pieza a la derecha (abajo en el celular). */
+:root{
+  --bg:#e8ece8;
+  --stage:#dfe5e0;
+  --panel:#f7f9f6;
+  --ink:#16201a;
+  --ink-2:#56635a;
+  --line:#cdd6cf;
+  --accent:#1d7656;          /* verde PCB */
+  --solder:#e0912f;          /* selección: color estaño caliente */
+  --chip:#e3e9e4;
+  --f-display:"Familjen Grotesk", "Segoe UI", system-ui, sans-serif;
+  --f-body:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --f-mono:"IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#101512; --stage:#151c18; --panel:#19211c; --ink:#e4ebe5; --ink-2:#9fada3;
+    --line:#2a352e; --accent:#4fbf8f; --solder:#f0a548; --chip:#222c25; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#101512; --stage:#151c18; --panel:#19211c; --ink:#e4ebe5; --ink-2:#9fada3;
+  --line:#2a352e; --accent:#4fbf8f; --solder:#f0a548; --chip:#222c25; color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--f-body);overflow:hidden}
+.app{height:100%;display:grid;grid-template-columns:1fr 340px;grid-template-rows:auto 1fr;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:12px;gap:12px}
+header{grid-column:1 / -1;display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header h1{font:700 22px/1.1 var(--f-display);margin:0;letter-spacing:-.01em}
+header p{margin:0;color:var(--ink-2);font-size:13px}
+.stage{position:relative;min-height:0;min-width:0;background:radial-gradient(ellipse at 50% 35%, var(--panel), var(--stage) 70%);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+#c{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
+.hint{position:absolute;left:12px;top:10px;font-size:12px;color:var(--ink-2);pointer-events:none}
+.dock{position:absolute;left:12px;right:12px;bottom:12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;
+  background:color-mix(in srgb,var(--panel) 88%,transparent);backdrop-filter:blur(8px);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.dock .slider{flex:1;min-width:180px;display:flex;align-items:center;gap:10px}
+.dock label.small{font:500 11px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2);white-space:nowrap}
+input[type=range]{flex:1;accent-color:var(--accent)}
+button{font:500 13px/1 var(--f-body);color:var(--ink);background:var(--chip);border:1px solid var(--line);border-radius:8px;padding:8px 11px;cursor:pointer}
+button:hover{border-color:var(--ink-2)}
+button:focus-visible,input:focus-visible{outline:2px solid var(--solder);outline-offset:2px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.side{min-height:0;display:flex;flex-direction:column;gap:12px;overflow:auto}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.eyebrow{font:500 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);margin:0 0 8px}
+#info h2{font:700 19px/1.2 var(--f-display);margin:0 0 6px;text-wrap:balance}
+#info .dims{font:400 12px/1.4 var(--f-mono);color:var(--accent);margin:0 0 10px}
+#info dl{margin:0;display:grid;gap:8px}
+#info dt{font:500 11px/1 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+#info dd{margin:3px 0 0}
+.parts{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.parts li{display:flex;align-items:center;gap:8px;padding:6px 6px;border-radius:8px;cursor:pointer}
+.parts li:hover{background:var(--chip)}
+.parts li.sel{background:color-mix(in srgb,var(--solder) 18%,transparent)}
+.parts .sw{width:12px;height:12px;border-radius:3px;flex:none;border:1px solid rgba(0,0,0,.2)}
+.parts .nm{flex:1;min-width:0}
+.parts input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+.note{font-size:12px;color:var(--ink-2);margin:10px 0 0}
+#err{position:absolute;inset:0;display:none;align-items:center;justify-content:center;text-align:center;padding:24px;color:var(--ink-2)}
+@media (max-width:760px){
+  body{overflow:auto}
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto auto;height:auto;min-height:100%}
+  .stage{display:flex;flex-direction:column}
+  #c{position:relative;inset:auto;height:56vh;min-height:320px}
+  .dock{position:relative;left:auto;right:auto;bottom:auto;margin:0 8px 8px}
+  .side{overflow:visible}
+  .dock{gap:8px;padding:8px}
+  .dock .slider{min-width:100%}
+}
+@media (prefers-reduced-motion: reduce){ *{transition:none!important} }
+</style>
+
+<div class="app">
+  <header>
+    <h1>Plantita · prototipo en 3D</h1>
+    <p>Medidas aproximadas en milímetros. Tocá una pieza para ver qué es.</p>
+  </header>
+
+  <section class="stage" aria-label="Visor 3D">
+    <canvas id="c"></canvas>
+    <div class="hint">Arrastrá para girar · rueda o pellizco para zoom · clic derecho para mover</div>
+    <div id="err">No se pudo cargar el visor 3D. Revisá la conexión y recargá la página.</div>
+    <div class="dock">
+      <div class="slider">
+        <label class="small" for="explode">Armado</label>
+        <input id="explode" type="range" min="0" max="100" value="0" aria-label="De armado a desarmado">
+        <label class="small" for="explode">Desarmado</label>
+      </div>
+      <div class="row">
+        <button id="btnAssemble" class="primary">Armar</button>
+        <button id="btnExplode">Desarmar</button>
+        <button id="btnGhost" aria-pressed="false">Carcasa transparente</button>
+        <button id="btnSpin" aria-pressed="false">Girar solo</button>
+        <button id="btnReset">Centrar</button>
+      </div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="card" id="info" aria-live="polite">
+      <p class="eyebrow">Pieza seleccionada</p>
+      <h2 id="iName">Placa LilyGO T-Display-S3</h2>
+      <p class="dims" id="iDims"></p>
+      <dl>
+        <div><dt>Qué es</dt><dd id="iWhat"></dd></div>
+        <div><dt>Dónde va</dt><dd id="iWhere"></dd></div>
+      </dl>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Piezas · mostrar u ocultar</p>
+      <ul class="parts" id="parts"></ul>
+      <div class="row" style="margin-top:10px">
+        <button id="btnAll">Mostrar todo</button>
+        <button id="btnSolo">Ver solo la seleccionada</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="eyebrow">Ánimo en la pantalla</p>
+      <div class="row" id="moods">
+        <button data-mood="feliz" aria-pressed="true">Feliz</button>
+        <button data-mood="sed" aria-pressed="false">Con sed</button>
+        <button data-mood="frio" aria-pressed="false">Con frío</button>
+        <button data-mood="dormida" aria-pressed="false">Durmiendo</button>
+      </div>
+      <p class="note">Las medidas de la carcasa son una propuesta para el prototipo. Las de la placa, la batería y los sensores salen de sus fichas técnicas.</p>
+    </div>
+  </aside>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function(){
+if (!window.THREE || !THREE.OrbitControls){ document.getElementById('err').style.display='flex'; return; }
+
+const reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const canvas = document.getElementById('c');
+const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true, preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputEncoding = THREE.sRGBEncoding;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
+const HOME_POS = new THREE.Vector3(230, 90, 340), HOME_TGT = new THREE.Vector3(0, -45, 0);
+function homePos(){ return HOME_POS.clone().sub(HOME_TGT).multiplyScalar(camera.aspect < 1 ? 1.25 : 1).add(HOME_TGT); }
+camera.position.copy(HOME_POS);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.copy(HOME_TGT); controls.enableDamping = true; controls.dampingFactor = .08;
+controls.minDistance = 60; controls.maxDistance = 900; controls.autoRotateSpeed = 1.2;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a958d, 0.9));
+const key = new THREE.DirectionalLight(0xffffff, 0.9); key.position.set(120, 200, 160); scene.add(key);
+const fill = new THREE.DirectionalLight(0xffffff, 0.35); fill.position.set(-160, 40, -120); scene.add(fill);
+
+// piso sutil para dar referencia
+const grid = new THREE.GridHelper(400, 40, 0x9aa79e, 0x9aa79e);
+grid.material.transparent = true; grid.material.opacity = .18; grid.position.y = -180; scene.add(grid);
+
+// ---------- helpers ----------
+function mat(color, opts){ return new THREE.MeshStandardMaterial(Object.assign({color, roughness:.6, metalness:.05}, opts||{})); }
+function box(w,h,d,m,x,y,z){ const me = new THREE.Mesh(new THREE.BoxGeometry(w,h,d), m); me.position.set(x||0,y||0,z||0); return me; }
+function rectPath(path, x0,y0,x1,y1, hole){
+  if (hole){ path.moveTo(x0,y0); path.lineTo(x0,y1); path.lineTo(x1,y1); path.lineTo(x1,y0); path.lineTo(x0,y0); }
+  else { path.moveTo(x0,y0); path.lineTo(x1,y0); path.lineTo(x1,y1); path.lineTo(x0,y1); path.lineTo(x0,y0); }
+  return path;
+}
+function roundedRect(shape, x,y,w,h,r){
+  shape.moveTo(x+r,y); shape.lineTo(x+w-r,y); shape.quadraticCurveTo(x+w,y,x+w,y+r);
+  shape.lineTo(x+w,y+h-r); shape.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  shape.lineTo(x+r,y+h); shape.quadraticCurveTo(x,y+h,x,y+h-r);
+  shape.lineTo(x,y+r); shape.quadraticCurveTo(x,y,x+r,y); return shape;
+}
+function extrude(shape, depth, m){ return new THREE.Mesh(new THREE.ExtrudeGeometry(shape,{depth, bevelEnabled:false, curveSegments:12}), m); }
+function eachMat(o, fn){ (Array.isArray(o.material) ? o.material : [o.material]).forEach(fn); }
+function canvasTex(w,h,draw){
+  const cv = document.createElement('canvas'); cv.width=w; cv.height=h; draw(cv.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(cv); t.encoding = THREE.sRGBEncoding; t.anisotropy = 4; return t;
+}
+
+// ---------- carita de la pantalla ----------
+const screenCanvas = document.createElement('canvas'); screenCanvas.width = 340; screenCanvas.height = 640;
+const screenTex = new THREE.CanvasTexture(screenCanvas); screenTex.encoding = THREE.sRGBEncoding;
+function drawMood(mood){
+  const g = screenCanvas.getContext('2d'), W = 340, H = 640;
+  const bg = {feliz:'#1f7a4a', sed:'#2b4fa8', frio:'#5a8fcf', dormida:'#1b2140'}[mood];
+  g.fillStyle = bg; g.fillRect(0,0,W,H);
+  const cx = W/2, cy = 250;
+  // maceta
+  g.fillStyle = '#c27a3e'; g.beginPath(); g.moveTo(cx-70,cy+150); g.lineTo(cx+70,cy+150); g.lineTo(cx+52,cy+260); g.lineTo(cx-52,cy+260); g.closePath(); g.fill();
+  g.fillStyle = '#a5622c'; g.fillRect(cx-78,cy+140,156,24);
+  // tallo y hojas
+  g.strokeStyle = '#7ccf6a'; g.lineWidth = 12; g.lineCap='round';
+  g.beginPath(); g.moveTo(cx,cy+140); g.lineTo(cx,cy+95); g.stroke();
+  g.fillStyle = '#7ccf6a';
+  g.beginPath(); g.ellipse(cx-34,cy+112,28,12,-0.5,0,Math.PI*2); g.fill();
+  g.beginPath(); g.ellipse(cx+34,cy+112,28,12,0.5,0,Math.PI*2); g.fill();
+  // cabeza
+  g.fillStyle = mood==='frio' ? '#bfe3ff' : '#f2c84b';
+  g.beginPath(); g.arc(cx,cy,95,0,Math.PI*2); g.fill();
+  g.fillStyle = '#1a1a1a'; g.strokeStyle = '#1a1a1a'; g.lineWidth = 10;
+  if (mood==='dormida'){
+    g.beginPath(); g.arc(cx-35,cy-12,16,0.1*Math.PI,0.9*Math.PI); g.stroke();
+    g.beginPath(); g.arc(cx+35,cy-12,16,0.1*Math.PI,0.9*Math.PI); g.stroke();
+    g.beginPath(); g.ellipse(cx,cy+40,12,9,0,0,Math.PI*2); g.fill();
+    g.fillStyle = '#e6ebff'; g.font = '700 46px "Familjen Grotesk", sans-serif'; g.fillText('z', cx+80, cy-70); g.font='700 32px "Familjen Grotesk", sans-serif'; g.fillText('z', cx+112, cy-108);
+  } else {
+    g.beginPath(); g.arc(cx-35,cy-15,13,0,Math.PI*2); g.fill();
+    g.beginPath(); g.arc(cx+35,cy-15,13,0,Math.PI*2); g.fill();
+    if (mood==='feliz'){ g.beginPath(); g.arc(cx,cy+15,45,0.15*Math.PI,0.85*Math.PI); g.stroke(); }
+    if (mood==='sed'){
+      g.beginPath(); g.arc(cx,cy+70,38,1.2*Math.PI,1.8*Math.PI); g.stroke();
+      g.fillStyle = '#e85d75'; g.beginPath(); g.ellipse(cx+10,cy+55,14,20,0,0,Math.PI*2); g.fill();
+      g.fillStyle = '#7fc8ff'; g.beginPath(); g.moveTo(cx+80,cy-70); g.quadraticCurveTo(cx+98,cy-38,cx+80,cy-30); g.quadraticCurveTo(cx+62,cy-38,cx+80,cy-70); g.fill();
+    }
+    if (mood==='frio'){
+      g.beginPath(); for (let i=0;i<7;i++){ const x = cx-48+i*16; g.lineTo(x, cy+45 + (i%2?14:0)); } g.stroke();
+    }
+  }
+  const txt = {feliz:'todo bien', sed:'tengo sed', frio:'tengo frío', dormida:'buenas noches'}[mood];
+  g.fillStyle = '#ffffff'; g.font = '600 40px "IBM Plex Sans", sans-serif'; g.textAlign='center'; g.fillText(txt, cx, 600);
+  g.textAlign='start';
+  screenTex.needsUpdate = true;
+}
+drawMood('feliz');
+
+// ---------- piezas ----------
+const pieces = [];
+const caseColor = 0x8fb8a0;
+function piece(def){
+  const grp = new THREE.Group(); grp.userData.pieceId = def.id;
+  def.build(grp);
+  grp.traverse(o => {
+    if (!o.isMesh) return;
+    o.userData.pieceId = def.id;
+    o.material = Array.isArray(o.material) ? o.material.map(m => m.clone()) : o.material.clone();
+  });
+  grp.position.copy(def.home);
+  scene.add(grp);
+  const p = Object.assign({group:grp, visible:true}, def);
+  pieces.push(p); return p;
+}
+
+// Carcasa frontal (marco con ventana)
+piece({ id:'frente', name:'Carcasa frontal', swatch:'#8fb8a0', case:true,
+  dims:'36 × 80 × 3 mm · ventana de 25 × 44 mm',
+  what:'El marco de adelante, impreso en 3D en PLA o PETG. Tiene la ventana por donde se ve la pantalla.',
+  where:'Encaja a presión sobre la carcasa trasera. Es lo primero que se saca para llegar a la placa.',
+  home:new THREE.Vector3(0,0,0), off:new THREE.Vector3(0,0,70),
+  build(g){
+    const s = roundedRect(new THREE.Shape(), -18,-40,36,80,4);
+    s.holes.push(rectPath(new THREE.Path(), -12.5,-18,12.5,26,true));
+    const m = extrude(s, 3, mat(caseColor,{roughness:.75})); m.position.z = 7; g.add(m);
+  }});
+
+// Placa
+piece({ id:'placa', name:'Placa LilyGO T-Display-S3', swatch:'#25292c',
+  dims:'≈ 62 × 26 mm · pantalla 1.9" (170 × 320 px)',
+  what:'El cerebro: ESP32-S3 con WiFi, Bluetooth, pantalla color y cargador de batería integrado.',
+  where:'Justo detrás del marco frontal, con la pantalla mirando a la ventana. El USB-C asoma por arriba para cargar.',
+  home:new THREE.Vector3(0,6,0), off:new THREE.Vector3(0,0,42),
+  build(g){
+    g.add(box(26,62,1.6, mat(0x1f2326,{roughness:.5}), 0,0,3.9));
+    g.add(box(25,46,2.4, mat(0x111111,{roughness:.3}), 0,-2,5.8));
+    const scr = new THREE.Mesh(new THREE.PlaneGeometry(22.7,42.7), new THREE.MeshBasicMaterial({map:screenTex}));
+    scr.position.set(0,-2,7.02); g.add(scr);
+    g.add(box(9,3.4,3.2, mat(0xb9bec4,{metalness:.8,roughness:.3}), 0,31.5,3.5));        // USB-C
+    g.add(box(1.8,5,3, mat(0xb9bec4,{metalness:.6,roughness:.4}), -13.4,20,5));        // botones
+    g.add(box(1.8,5,3, mat(0xb9bec4,{metalness:.6,roughness:.4}), -13.4,10,5));
+    g.add(box(7,4,1.4, mat(0xf2efe6), 8,26,3));                                        // conector STEMMA QT
+    g.add(box(5,3.5,1.4, mat(0xf2efe6), 8,-24,3));                                     // conector batería
+    g.add(box(18,18,1.4, mat(0x2b2f33,{metalness:.5,roughness:.4}), -2,6,3));          // módulo ESP32
+  }});
+
+// Batería
+const batTex = canvasTex(300,400,(g,W,H)=>{
+  g.fillStyle='#c7ccd1'; g.fillRect(0,0,W,H);
+  g.fillStyle='#f4f2ec'; g.fillRect(30,110,240,170);
+  g.fillStyle='#1b1b1b'; g.font='700 56px "IBM Plex Sans",sans-serif'; g.textAlign='center'; g.fillText('3.7V',150,190);
+  g.font='500 36px "IBM Plex Mono",monospace'; g.fillText('1000mAh',150,245);
+  g.font='500 26px "IBM Plex Mono",monospace'; g.fillStyle='#55606a'; g.fillText('803040 · LiPo',150,330);
+});
+piece({ id:'bateria', name:'Batería LiPo 1000 mAh', swatch:'#c7ccd1',
+  dims:'40 × 30 × 8 mm (803040)',
+  what:'La batería plana de litio-polímero. Con el modo sueño, debería durar 2 a 3 meses por carga.',
+  where:'Detrás de la placa, pegada con cinta doble faz. Se conecta al conector JST de la placa.',
+  home:new THREE.Vector3(0,5,-3), off:new THREE.Vector3(-75,0,10),
+  build(g){
+    const side = mat(0xc7ccd1,{metalness:.55,roughness:.35});
+    const front = new THREE.MeshStandardMaterial({map:batTex, roughness:.5});
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(30,40,8), [side,side,side,side,front,side]));
+  }});
+
+// AHT20
+piece({ id:'aht20', name:'Sensor AHT20 (temperatura y humedad)', swatch:'#6a4bb0',
+  dims:'≈ 15 × 11 mm',
+  what:'Mide la temperatura y la humedad del aire alrededor de la planta.',
+  where:'Abajo, contra la tapa trasera, frente a las ranuras de ventilación. Así mide el aire de afuera y no el calor de la placa.',
+  home:new THREE.Vector3(0,-27,-7.2), off:new THREE.Vector3(55,-10,-30),
+  build(g){
+    g.add(box(15,11,1.6, mat(0x6a4bb0,{roughness:.5})));
+    g.add(box(3.2,3.2,1, mat(0x151515), 0,0,1.2));
+    for (let i=0;i<4;i++) g.add(box(1.2,1.2,1, mat(0xd8a73a,{metalness:.7,roughness:.3}), -4.5+i*3,-4,1));
+  }});
+
+// BH1750
+piece({ id:'bh1750', name:'Sensor de luz BH1750', swatch:'#2d62b0',
+  dims:'≈ 18,5 × 14 mm',
+  what:'Mide cuánta luz recibe la planta, en lux. También avisa cuándo es de noche.',
+  where:'Arriba, mirando hacia el techo, debajo de un agujerito de la carcasa por donde entra la luz.',
+  home:new THREE.Vector3(8,35.6,-4), off:new THREE.Vector3(30,55,-10),
+  build(g){
+    g.add(box(14,1.6,18.5, mat(0x2d62b0,{roughness:.5})));
+    g.add(box(4,1,3.5, mat(0xf2efe6), 0,1.2,-3));
+    const lens = new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.3,1.2,20), mat(0x111111)); lens.position.set(0,1.6,-3); g.add(lens);
+    for (let i=0;i<5;i++) g.add(box(1.2,1,1.2, mat(0xd8a73a,{metalness:.7,roughness:.3}), -5+i*2.5,1,7.5));
+  }});
+
+// Sensor capacitivo
+piece({ id:'sensor', name:'Sensor de humedad capacitivo v1.2', swatch:'#2b2e30',
+  dims:'98 × 23 mm · se entierra hasta la línea marcada',
+  what:'La varilla que se clava en la tierra y mide cuánta agua tiene, sin metal expuesto.',
+  where:'Entra por la ranura de abajo de la carcasa. La parte con el chip queda adentro y sellada; la punta va en la maceta.',
+  home:new THREE.Vector3(0,-27,0), off:new THREE.Vector3(0,-60,0),
+  build(g){
+    const s = new THREE.Shape();
+    s.moveTo(-11.5,0); s.lineTo(11.5,0); s.lineTo(11.5,-26); s.lineTo(8,-30); s.lineTo(8,-84); s.lineTo(0,-98); s.lineTo(-8,-84); s.lineTo(-8,-30); s.lineTo(-11.5,-26); s.lineTo(-11.5,0);
+    const m = extrude(s, 1.6, mat(0x2a2d30,{roughness:.45})); m.position.z = -0.8; g.add(m);
+    g.add(box(6,5,1.4, mat(0x151515), 0,-10,1.4));
+    g.add(box(8,4,5, mat(0xf2efe6), 0,2,0));
+    const line = box(15,0.6,0.2, mat(0xffffff,{roughness:.9}), 0,-40,0.9); g.add(line);
+  }});
+
+// Carcasa trasera
+piece({ id:'trasera', name:'Carcasa trasera', swatch:'#7aa38b', case:true,
+  dims:'36 × 80 × 17 mm · paredes de 2 mm',
+  what:'La caja de atrás, impresa en 3D. Tiene el hueco del USB-C, el agujerito de la luz, las ranuras de aire y la ranura del sensor.',
+  where:'Envuelve todo. El marco frontal encaja adelante.',
+  home:new THREE.Vector3(0,0,0), off:new THREE.Vector3(0,0,-70),
+  build(g){
+    const m = mat(0x7aa38b,{roughness:.75});
+    // tapa trasera con ranuras
+    const back = roundedRect(new THREE.Shape(), -18,-40,36,80,4);
+    for (let i=0;i<4;i++) back.holes.push(rectPath(new THREE.Path(), -8, -31+i*3, 8, -30+i*3, true));
+    const b = extrude(back, 2, m); b.position.z = -10; g.add(b);
+    // laterales
+    g.add(box(2,76,15, m, -17,0,-0.5)); g.add(box(2,76,15, m, 17,0,-0.5));
+    // techo: hueco USB-C y agujero de luz
+    const top = rectPath(new THREE.Shape(), -16,-8,16,7);
+    top.holes.push(rectPath(new THREE.Path(), -5,1.5,5,5.5,true));
+    const hole = new THREE.Path(); hole.absarc(8,-4,2.6,0,Math.PI*2,true); top.holes.push(hole);
+    const t = extrude(top, 2, m); t.rotation.x = Math.PI/2; t.position.y = 40; g.add(t);
+    // piso: ranura del sensor
+    const bot = rectPath(new THREE.Shape(), -16,-8,16,7);
+    bot.holes.push(rectPath(new THREE.Path(), -12,-1.2,12,1.2,true));
+    const bo = extrude(bot, 2, m); bo.rotation.x = Math.PI/2; bo.position.y = -38; g.add(bo);
+  }});
+
+// ---------- cables ----------
+const byId = Object.fromEntries(pieces.map(p => [p.id, p]));
+const wires = [
+  // batería -> placa (JST)
+  {a:['bateria',  9,-15,4], b:['placa', 7.5,-24,2.3], c:0xd24b3c},
+  {a:['bateria', 11,-15,4], b:['placa', 9.5,-24,2.3], c:0x222222},
+  // sensor de humedad -> pines de la placa (VCC, GND, señal)
+  {a:['sensor', -2.5,4.5,0], b:['placa', -11,-18,3.6], c:0xd24b3c},
+  {a:['sensor',  0,  4.5,0], b:['placa', -11,-21,3.6], c:0x222222},
+  {a:['sensor',  2.5,4.5,0], b:['placa', -11,-24,3.6], c:0xf0c43a},
+  // AHT20 -> STEMMA QT (I2C)
+  {a:['aht20', -4.5,-4,1.5], b:['placa', 5.5,26,2.3], c:0x222222},
+  {a:['aht20', -1.5,-4,1.5], b:['placa', 7.5,26,2.3], c:0xd24b3c},
+  {a:['aht20',  1.5,-4,1.5], b:['placa', 9.5,26,2.3], c:0x3a6fd8},
+  {a:['aht20',  4.5,-4,1.5], b:['placa', 11.5,26,2.3], c:0xf0c43a},
+  // BH1750 -> mismo bus I2C
+  {a:['bh1750', -2.5,1.4,7.5], b:['placa', 6.5,24,2.3], c:0xd24b3c},
+  {a:['bh1750',  0,  1.4,7.5], b:['placa', 8.5,24,2.3], c:0x222222},
+  {a:['bh1750',  2.5,1.4,7.5], b:['placa', 10.5,24,2.3], c:0x3a6fd8},
+  {a:['bh1750',  5,  1.4,7.5], b:['placa', 12.5,24,2.3], c:0xf0c43a},
+];
+const wireGroup = new THREE.Group(); scene.add(wireGroup);
+wires.forEach(w => { w.mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat(w.c,{roughness:.45})); wireGroup.add(w.mesh); });
+const tmpA = new THREE.Vector3(), tmpB = new THREE.Vector3();
+function updateWires(){
+  wires.forEach(w => {
+    const pa = byId[w.a[0]], pb = byId[w.b[0]];
+    w.mesh.visible = pa.visible && pb.visible && showWires;
+    if (!w.mesh.visible) return;
+    tmpA.set(w.a[1],w.a[2],w.a[3]).add(pa.group.position);
+    tmpB.set(w.b[1],w.b[2],w.b[3]).add(pb.group.position);
+    const d = tmpA.distanceTo(tmpB);
+    const sag = Math.min(14, 2 + d*0.12);
+    const p1 = tmpA.clone().lerp(tmpB, .33); p1.z -= sag*.4; p1.y -= sag*.5;
+    const p2 = tmpA.clone().lerp(tmpB, .66); p2.z -= sag*.4; p2.y -= sag*.5;
+    const curve = new THREE.CatmullRomCurve3([tmpA.clone(), p1, p2, tmpB.clone()]);
+    w.mesh.geometry.dispose();
+    w.mesh.geometry = new THREE.TubeGeometry(curve, 28, .45, 6, false);
+  });
+}
+let showWires = true;
+
+// ---------- explosión ----------
+let t = 0, tTarget = 0;
+const slider = document.getElementById('explode');
+function ease(x){ return x<.5 ? 2*x*x : 1 - Math.pow(-2*x+2,2)/2; }
+function applyExplode(){
+  const e = ease(t);
+  pieces.forEach(p => p.group.position.copy(p.home).addScaledVector(p.off, e));
+  updateWires();
+}
+slider.addEventListener('input', () => { t = tTarget = slider.value/100; applyExplode(); });
+function goTo(v){ tTarget = v; if (reduceMotion){ t = v; slider.value = v*100; applyExplode(); } }
+document.getElementById('btnAssemble').onclick = () => goTo(0);
+document.getElementById('btnExplode').onclick = () => goTo(1);
+
+// ---------- carcasa transparente ----------
+const btnGhost = document.getElementById('btnGhost');
+btnGhost.onclick = () => {
+  const on = btnGhost.getAttribute('aria-pressed') !== 'true';
+  btnGhost.setAttribute('aria-pressed', on);
+  pieces.filter(p => p.case).forEach(p => p.group.traverse(o => { if (o.isMesh) eachMat(o, m => { m.transparent = on; m.opacity = on ? .22 : 1; m.depthWrite = !on; }); }));
+};
+const btnSpin = document.getElementById('btnSpin');
+btnSpin.onclick = () => { controls.autoRotate = !controls.autoRotate; btnSpin.setAttribute('aria-pressed', controls.autoRotate); };
+document.getElementById('btnReset').onclick = () => { camera.position.copy(homePos()); controls.target.copy(HOME_TGT); };
+
+// ---------- selección e info ----------
+const partsEl = document.getElementById('parts');
+let selected = null;
+pieces.forEach(p => {
+  const li = document.createElement('li'); li.dataset.id = p.id;
+  li.innerHTML = `<input type="checkbox" id="vis-${p.id}" checked aria-label="Mostrar ${p.name}"><span class="sw" style="background:${p.swatch}"></span><span class="nm">${p.name}</span>`;
+  const cb = li.querySelector('input');
+  cb.addEventListener('click', e => e.stopPropagation());
+  cb.addEventListener('change', () => setVisible(p, cb.checked));
+  li.addEventListener('click', () => select(p.id));
+  partsEl.appendChild(li); p.li = li; p.cb = cb;
+});
+function setVisible(p, v){ p.visible = v; p.group.visible = v; p.cb.checked = v; updateWires(); }
+document.getElementById('btnAll').onclick = () => pieces.forEach(p => setVisible(p, true));
+document.getElementById('btnSolo').onclick = () => { if (!selected) return; pieces.forEach(p => setVisible(p, p.id === selected)); };
+
+function select(id){
+  selected = id;
+  pieces.forEach(p => {
+    const on = p.id === id;
+    p.li.classList.toggle('sel', on);
+    p.group.traverse(o => { if (o.isMesh) eachMat(o, m => { if (m.emissive) m.emissive.setHex(on ? 0x3a2206 : 0x000000); }); });
+  });
+  const p = byId[id];
+  document.getElementById('iName').textContent = p.name;
+  document.getElementById('iDims').textContent = p.dims;
+  document.getElementById('iWhat').textContent = p.what;
+  document.getElementById('iWhere').textContent = p.where;
+}
+
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+let downAt = null;
+canvas.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+canvas.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX-downAt[0], e.clientY-downAt[1]) > 5) return;
+  const r = canvas.getBoundingClientRect();
+  mouse.set(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(mouse, camera);
+  const hits = ray.intersectObjects(pieces.filter(p => p.visible).map(p => p.group), true);
+  const solid = h => { const m = Array.isArray(h.object.material) ? h.object.material[0] : h.object.material; return !(m.transparent && m.opacity < .5); };
+  const hit = hits.find(solid) || hits[0];
+  if (hit) select(hit.object.userData.pieceId);
+});
+canvas.addEventListener('pointermove', e => {
+  const r = canvas.getBoundingClientRect();
+  mouse.set(((e.clientX-r.left)/r.width)*2-1, -((e.clientY-r.top)/r.height)*2+1);
+  ray.setFromCamera(mouse, camera);
+  canvas.style.cursor = ray.intersectObjects(pieces.filter(p => p.visible).map(p => p.group), true).length ? 'pointer' : 'grab';
+});
+
+// ---------- ánimos ----------
+document.querySelectorAll('#moods button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('#moods button').forEach(x => x.setAttribute('aria-pressed', x === b));
+  drawMood(b.dataset.mood);
+});
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { const on = document.querySelector('#moods [aria-pressed="true"]'); drawMood(on ? on.dataset.mood : 'feliz'); });
+
+// ---------- loop ----------
+function resize(){
+  const r = canvas.parentElement.getBoundingClientRect();
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / Math.max(r.height,1); camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(canvas.parentElement);
+resize();
+camera.position.copy(homePos());
+select('placa');
+applyExplode();
+// arranca un poco desarmado para que se vean las piezas
+t = 0; tTarget = reduceMotion ? 0 : .55; if (reduceMotion){ t = .55; tTarget = .55; slider.value = 55; applyExplode(); }
+
+function frame(){
+  if (Math.abs(tTarget - t) > .001){
+    t += (tTarget - t) * .08; if (Math.abs(tTarget - t) < .002) t = tTarget;
+    slider.value = Math.round(t*100); applyExplode();
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+frame();
+})();
+</script>
+
+</body></html>
